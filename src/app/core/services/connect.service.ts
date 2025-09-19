@@ -104,14 +104,14 @@ export class ConnectService {
                 ),
                 buttons: [
                     {
-                        text: 'Ablehnen',
+                        text: 'Cancel',
                         role: 'cancel',
                         handler: () => {
                             resolve(false);
                         },
                     },
                     {
-                        text: 'Annehmen',
+                        text: 'Accept',
                         handler: () => {
                             resolve(true);
                         },

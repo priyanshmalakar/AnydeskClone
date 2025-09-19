@@ -1,12 +1,27 @@
 <ion-header>
-    <ion-toolbar color="primary">
-        <ion-buttons slot="start">
-            <ion-menu-button></ion-menu-button>
-        </ion-buttons>
-        <ion-title> {{'Settings'| translate}} </ion-title>
+  <div class="bg-gradient-to-r from-blue-200 to-blue-400 shadow-lg">
+    <ion-toolbar>
+      <ion-buttons slot="start">
+        <ion-menu-button class="text-blue-900"></ion-menu-button>
+      </ion-buttons>
+      <ion-title class="!text-blue-900 !font-bold !text-xl">{{'Settings'| translate}}</ion-title>
+      <ion-buttons slot="end" class="mr-3">
+        <ion-spinner
+          *ngIf="connectService.fileLoading"
+          color="primary"
+          class="w-5 h-5">
+        </ion-spinner>
+        <ion-button
+          [tp]="'Select screen' | translate"
+          (click)="screenSelect(false, true)"
+          fill="clear"
+          class="!text-blue-900 hover:bg-blue-100 transition-colors">
+          <ion-icon name="browsers-outline" class="text-lg"></ion-icon>
+        </ion-button>
+      </ion-buttons>
     </ion-toolbar>
+  </div>
 </ion-header>
-
 <ion-content class="ion-padding">
     <div
         class="box flex flex-col shadow-xl rounded-xl mt-3 overflow-hidden mb-5 bg-white p-3">
