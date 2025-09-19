@@ -10,14 +10,14 @@ import { ConnectService } from '../../app/core/services/connect.service';
 export class AddressBookPage implements OnInit {
     constructor(
         public addressBookService: AddressBookService,
-        private connectService: ConnectService
+        public connectService: ConnectService
     ) {}
 
     async ngOnInit() {
         await this.addressBookService.load();
     }
 
-    connect(id) {
+    connect(id: string) {
         this.connectService.connect(id);
     }
 }

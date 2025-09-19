@@ -12,11 +12,12 @@
           class="w-5 h-5">
         </ion-spinner>
         <ion-button
-          [tp]="'Select screen' | translate"
+          [title]="'Select screen' | translate"
           (click)="screenSelect(false, true)"
           fill="clear"
           class="!text-blue-900 hover:bg-blue-100 transition-colors">
           <ion-icon name="browsers-outline" class="text-lg"></ion-icon>
+          >
         </ion-button>
       </ion-buttons>
     </ion-toolbar>
@@ -120,7 +121,7 @@
                     </div>
 
                     <ion-button
-                        (click)="connect(addressBook.id)"
+                        (click)="connect()"
                         fill="solid"
                         color="success"
                         class="bg-blue-200 text-white font-semibold px-6 py-3 rounded-xl shadow-md transform hover:scale-105 transition-all duration-200 border-0">

@@ -150,5 +150,29 @@
     "webdriver-manager": "12.1.9",
     "webpack-node-externals": "3.0.0",
     "zone.js": "~0.13.1"
-  }
+  },
+  "build": {
+    
+  "appId": "com.codext.anydeskclone",
+  "productName": "AnyDeskClone",
+  "files": [
+    "dist/**/*",
+    "main.js",
+    "package.json"
+  ],
+  "directories": {
+    "output": "release"
+  },
+  "win": {
+    "target": "nsis"
+  },
+  "mac": {
+    "target": "dmg"
+  },
+  "linux": {
+    "target": "AppImage"
+  },
+  "publish": null
+}
+
 }

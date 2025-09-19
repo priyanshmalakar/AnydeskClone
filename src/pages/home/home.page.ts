@@ -25,10 +25,10 @@ export class HomePage implements OnInit {
 
     constructor(
         public electronService: ElectronService,
-        private addressBookService: AddressBookService,
+        public addressBookService: AddressBookService,
         public connectService: ConnectService,
-        private modalCtrl: ModalController,
-        private alertCtrl: AlertController
+        public modalCtrl: ModalController,
+        public alertCtrl: AlertController
     ) {}
 
     async ngOnInit() {}

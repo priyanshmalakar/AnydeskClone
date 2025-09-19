@@ -32,7 +32,7 @@ export class AppComponent implements AfterViewInit {
         public electronService: ElectronService,
         public appService: AppService,
         private modalCtrl: ModalController,
-        private connectService: ConnectService,
+        public connectService: ConnectService,
         private settingsService: SettingsService,
         private translateService: TranslateService
     ) {

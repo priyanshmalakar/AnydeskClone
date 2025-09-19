@@ -123,9 +123,12 @@ export class SettingsPage implements OnInit {
         private translate: TranslateService,
         private actionSheetCtrl: ActionSheetController,
         public settingsService: SettingsService,
-        private connectService: ConnectService
+        public connectService: ConnectService
     ) {}
-
+screenSelect(showDialog: boolean, autoSelect: boolean) {
+  console.log('Screen select triggered', showDialog, autoSelect);
+  // Your logic here...
+}
     ngOnInit() {
         const loginSettings = this.electronService.app.getLoginItemSettings();
 
