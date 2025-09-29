@@ -122,8 +122,9 @@ import { TranslateService } from '@ngx-translate/core';
     styleUrls: ['./app.component.scss'],
 })
 export class AppComponent implements AfterViewInit {
-    platform = (window as any).process;
-    process = (window as any).process;
+    // safe access to process (may be undefined in browser context)
+    platform = (window as any)?.process ?? null;
+    process = (window as any)?.process ?? null;
     version = '##version##';
 
     appPages = [

@@ -383,7 +383,11 @@ export class SettingsPage implements OnInit {
         } catch (err) {
             console.warn('Could not get login item settings', err);
         }
-        this.compName = this.electronService.os.hostname();
+        try {
+            this.compName = this.electronService.os.hostname();
+        } catch (err) {
+            this.compName = '';
+        }
         this.cdr.detectChanges();
     }
 

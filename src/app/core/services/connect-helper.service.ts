@@ -230,54 +230,80 @@ export class ConnectHelperService {
   }
 
   // Keyboard handler
-  async handleKey(data: { key: string; shift?: boolean; control?: boolean; alt?: boolean; meta?: boolean; code?: string }) {
+  /**
+   * data: { key: string; shift?: boolean; control?: boolean; alt?: boolean; meta?: boolean; code?: string }
+   */
+  async handleKey(data: { key?: string; shift?: boolean; control?: boolean; alt?: boolean; meta?: boolean; code?: string }) {
     try {
       if (!this.electronService.isElectron) {
         console.log('Not running in electron - keyboard input ignored.', data);
         return;
       }
 
+      // Determine platform safely (electron process or navigator)
+      const rawPlatform = (window as any)?.process?.platform ?? (navigator?.platform ?? '').toString();
+      const platformStr = String(rawPlatform).toLowerCase();
+      const isMac = platformStr.includes('darwin') || platformStr.includes('mac');
+
       const modifiers: Key[] = [];
       if (data.shift) modifiers.push(Key.LeftShift);
-      if (data.control) modifiers.push(process.platform === 'darwin' ? Key.LeftSuper : Key.LeftControl);
+      if (data.control) modifiers.push(isMac ? Key.LeftControl : Key.LeftControl); // control mapped to LeftControl (on mac control exists too)
       if (data.alt) modifiers.push(Key.LeftAlt);
       if (data.meta) modifiers.push(Key.LeftSuper);
 
-      // Printable characters
+      // Helper to get a reversed copy without mutating original
+      const reversedModifiers = [...modifiers].reverse();
+
+      // If single printable character -> type it (with modifiers pressed)
       if (data.key && data.key.length === 1) {
         if (modifiers.length > 0) {
           for (const m of modifiers) await keyboard.pressKey(m);
           await keyboard.type(data.key);
-          for (const m of modifiers.reverse()) await keyboard.releaseKey(m);
+          for (const m of reversedModifiers) await keyboard.releaseKey(m);
         } else {
           await keyboard.type(data.key);
         }
-      } else {
-        // Special keys
-        const keyName = data.code || data.key;
-        let keyToPress: Key | null = null;
-        try {
-          keyToPress = (Key as any)[keyName] ?? null;
-        } catch {
-          keyToPress = null;
-        }
+        return;
+      }
 
-        if (keyToPress) {
+      // For special keys, try to map using code or key if possible
+      const keyName = data.code || data.key || '';
+      let keyToPress: Key | null = null;
+
+      // Try multiple strategies to look up enum value
+      try {
+        // direct lookup (if code matches enum member name)
+        keyToPress = (Key as any)[keyName] ?? null;
+        if (!keyToPress && data.key) {
+          // try with the human-readable key name as fallback
+          keyToPress = (Key as any)[data.key] ?? null;
+        }
+      } catch (e) {
+        keyToPress = null;
+      }
+
+      if (keyToPress) {
+        if (modifiers.length > 0) {
+          for (const m of modifiers) await keyboard.pressKey(m);
+          await keyboard.pressKey(keyToPress);
+          await keyboard.releaseKey(keyToPress);
+          for (const m of reversedModifiers) await keyboard.releaseKey(m);
+        } else {
+          await keyboard.pressKey(keyToPress);
+          await keyboard.releaseKey(keyToPress);
+        }
+      } else {
+        // if we couldn't map to a Key, fall back to typing the key string (if present)
+        if (data.key) {
           if (modifiers.length > 0) {
             for (const m of modifiers) await keyboard.pressKey(m);
-            await keyboard.pressKey(keyToPress);
-            await keyboard.releaseKey(keyToPress);
-            for (const m of modifiers.reverse()) await keyboard.releaseKey(m);
+            await keyboard.type(data.key);
+            for (const m of reversedModifiers) await keyboard.releaseKey(m);
           } else {
-            await keyboard.pressKey(keyToPress);
-            await keyboard.releaseKey(keyToPress);
+            await keyboard.type(data.key);
           }
         } else {
-          if (data.key) {
-            await keyboard.type(data.key);
-          } else {
-            console.warn('Unknown key to press:', data);
-          }
+          console.warn('Unknown key to press and no fallback text:', data);
         }
       }
     } catch (error) {

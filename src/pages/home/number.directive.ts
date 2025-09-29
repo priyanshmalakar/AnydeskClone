@@ -47,6 +47,9 @@ export class NumberDirective {
             numbers.push(trimmed.substr(i, 4));
         }
 
+        // update native value and dispatch input event for angular forms if needed
         input.value = numbers.join(' ');
+        const evt = new Event('input', { bubbles: true });
+        input.dispatchEvent(evt);
     }
 }
