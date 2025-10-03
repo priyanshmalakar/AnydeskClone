@@ -3,5 +3,5 @@ export const AppConfig = {
     environment: 'WEB',
     appName: 'remotecontrol-desktop',
     // api: 'https://node.remote-control.codext.de',
-        api: 'http://localhost:3000',
+        api: 'https://remote-updated-backend.onrender.com',
 };
