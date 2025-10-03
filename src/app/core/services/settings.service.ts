@@ -1,5 +1,4 @@
 import { Injectable } from '@angular/core';
-import { TranslateService } from '@ngx-translate/core';
 import { get, set } from './storage.service';
 
 @Injectable({
@@ -13,27 +12,27 @@ export class SettingsService {
     };
 
     language: { text: string; code: string } = {
-        text: 'Deutsch',
-        code: 'de',
+        text: 'English',
+        code: 'en',
     };
 
-    constructor(
-        private translate: TranslateService
-    ) {}
+    constructor() {}
 
     async load() {
+        console.log('[SETTINGS] Loading settings...');
         const settings: any = await get('settings');
-        if (settings?.language) {
-            this.language = settings.language;
-            this.translate.setDefaultLang(settings?.language.code);
+        if (settings) {
+            Object.assign(this.settings, settings);
+            console.log('[SETTINGS] Loaded:', this.settings);
         } else {
-            this.translate.setDefaultLang('en');
+            console.log('[SETTINGS] No saved settings, using defaults');
         }
-        Object.assign(this.settings, settings);
     }
 
     async saveSettings(settings) {
+        console.log('[SETTINGS] Saving settings:', settings);
         Object.assign(this.settings, settings);
         await set('settings', this.settings);
+        console.log('[SETTINGS] Settings saved successfully');
     }
 }

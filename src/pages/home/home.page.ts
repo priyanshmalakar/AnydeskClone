@@ -79,7 +79,7 @@ export class HomePage implements OnInit {
         const id = ids.join('');
         if (id.length != 9) {
             const alert = await this.alertCtrl.create({
-                header: 'Die ID ist nicht vollständig',
+                header: 'The ID is not complete',
             });
             await alert.present();
             return;

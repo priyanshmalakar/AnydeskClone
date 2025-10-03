@@ -38,32 +38,30 @@ export class ConnectService {
     remoteIdArray: any = [{}, {}, {}, {}, {}, {}, {}, {}, {}];
     remoteId: string = '';
     fileLoading = false;
-
-    constructor(
-        private electronService: ElectronService,
-        private socketService: SocketService,
-        private connectHelperService: ConnectHelperService,
-        private loadingCtrl: LoadingController,
-        private settingsService: SettingsService,
-        private alertCtrl: AlertController,
-        private translateService: TranslateService
-    ) {}
-
+constructor(
+    private electronService: ElectronService,
+    private socketService: SocketService,
+    private connectHelperService: ConnectHelperService,
+    private loadingCtrl: LoadingController,
+    private settingsService: SettingsService,
+    private alertCtrl: AlertController
+) {}
     clipboardListener() {
-        const clipboard = this.electronService.clipboard;
-        clipboard
-            .on('text-changed', () => {
+    const clipboard = this.electronService.clipboard;
+    clipboard
+        .on('text-changed', () => {
+            if (this.peer1 && this.connected) {
                 const currentText = clipboard.readText();
-                console.log('currentText', currentText);
+                console.log('[CONNECT] 📋 Clipboard text changed');
                 this.peer1.send('clipboard-' + currentText);
-            })
-
-            .on('image-changed', () => {
-                const currentIMage = clipboard.readImage();
-                console.log('currentText', currentIMage);
-            })
-            .startWatching();
-    }
+            }
+        })
+        .on('image-changed', () => {
+            const currentImage = clipboard.readImage();
+            console.log('[CONNECT] 📋 Clipboard image changed');
+        })
+        .startWatching();
+}
 
     setId(id) {
         if (id.length == 9) {
@@ -77,218 +75,85 @@ export class ConnectService {
         }
     }
 
-    sendScreenSize() {
-        // TODO fixme
-        const scaleFactor =
-            process.platform === 'darwin'
-                ? 1
-                : this.electronService.remote.screen.getPrimaryDisplay()
-                      .scaleFactor;
+  sendScreenSize() {
+    const scaleFactor =
+        process.platform === 'darwin'
+            ? 1
+            : this.electronService.remote.screen.getPrimaryDisplay()
+                  .scaleFactor;
 
-        const { width, height } =
-            this.electronService.remote.screen.getPrimaryDisplay().size;
-        this.socketService.sendMessage(
-            `screenSize,${width * scaleFactor},${height * scaleFactor}`
-        );
-        console.log('scaleFactor', scaleFactor, width, height);
+    const { width, height } =
+        this.electronService.remote.screen.getPrimaryDisplay().size;
+    
+    const finalWidth = width * scaleFactor;
+    const finalHeight = height * scaleFactor;
+    
+    console.log('[CONNECT] 📐 Sending screen size:', finalWidth, 'x', finalHeight);
+    this.socketService.sendMessage(`screenSize,${finalWidth},${finalHeight}`);
+}
 
-        //this.socketService.sendMessage(`screenSize,1920,1080`);
-    }
+        videoConnector() {
+    this.loading.dismiss();
+    const source = this.videoSource;
+    const stream = source.stream;
 
-    async askForConnectPermission() {
-        return new Promise(async resolve => {
-            const alert = await this.alertCtrl.create({
-                header: this.translateService.instant('New connection'),
-                message: this.translateService.instant(
-                    'Do you want to accept the connection?'
-                ),
-                buttons: [
-                    {
-                        text: 'Cancel',
-                        role: 'cancel',
-                        handler: () => {
-                            resolve(false);
-                        },
-                    },
-                    {
-                        text: 'Accept',
-                        handler: () => {
-                            resolve(true);
-                        },
-                    },
-                ],
-            });
+    this.peer1 = new SimplePeer({
+        initiator: true,
+        stream: stream,
+        config: {
+            iceServers: [
+                { urls: "stun:stun.relay.metered.ca:80" },
+                {
+                    urls: "turn:global.relay.metered.ca:80",
+                    username: "63549d560f2efcb312cd67de",
+                    credential: "qh7UD1VgYnwSWhmQ",
+                },
+                {
+                    urls: "turn:global.relay.metered.ca:80?transport=tcp",
+                    username: "63549d560f2efcb312cd67de",
+                    credential: "qh7UD1VgYnwSWhmQ",
+                },
+                {
+                    urls: "turn:global.relay.metered.ca:443",
+                    username: "63549d560f2efcb312cd67de",
+                    credential: "qh7UD1VgYnwSWhmQ",
+                },
+                {
+                    urls: "turns:global.relay.metered.ca:443?transport=tcp",
+                    username: "63549d560f2efcb312cd67de",
+                    credential: "qh7UD1VgYnwSWhmQ",
+                },
+            ],
+        },
+    });
+console.log('[CONNECT] ✅ SimplePeer instance created');
+   this.peer1.on('signal', data => {
+    console.log('[PEER] 📡 Signal generated, sending to socket...');
+    this.socketService.sendMessage(data);
+});
 
-            await alert.present();
-        });
-        /*return new Promise(resolve => {
-            const dialogRef = this.dialog.open(AskForPermissionPage, {
-                width: '250px',
-            });
+this.peer1.on('error', (err) => {
+    console.error('[PEER] ❌ Error:', err);
+    this.reconnect();
+});
 
-            dialogRef.afterClosed().subscribe(result => {
-                resolve(result);
-            });
-        });*/
-    }
+this.peer1.on('close', () => {
+    console.warn('[PEER] ⚠️ Connection closed');
+    this.reconnect();
+});
 
-    async generateId() {
-        if (this.settingsService.settings?.randomId) {
-            this.id = `${this.connectHelperService.threeDigit()}${this.connectHelperService.threeDigit()}${this.connectHelperService.threeDigit()}`;
-        } else {
-            const nodeMachineId = this.electronService.nodeMachineId; //this.ngxService.remote.require('node-machine-id');
-            const id = await nodeMachineId.machineId();
-            const uniqId = parseInt(id, 36).toString().substring(3, 12);
-            this.id = uniqId;
-        }
-        this.idArray = ('' + this.id).split('');
-    }
+this.peer1.on('connect', () => {
+    console.log('[PEER] ✅ Connected successfully!');
+    this.connected = true;
+    
+    // Start clipboard monitoring AFTER connection
+    this.clipboardListener();
+    
+    this.connectHelperService.showInfoWindow();
+    const win = this.electronService.window;
+    win.minimize();
+});
 
-    async init() {
-        if (this.initialized) {
-            return;
-        }
-        this.initialized = true;
-        await this.generateId();
-
-        this.loading = await this.loadingCtrl.create({
-            duration: 15000,
-        });
-
-        // TODO fixme
-        this.electronService.remote.screen.addListener(
-            'display-metrics-changed',
-            () => {
-                this.sendScreenSize();
-            }
-        );
-
-        this.spf = new SimplePeerFiles();
-
-        this.socketService.init();
-        this.socketService.joinRoom(this.id);
-
-        this.sub3 = this.socketService.onDisconnected().subscribe(async () => {
-            const alert = await this.alertCtrl.create({
-                header: 'Info',
-                message: this.translateService.instant(
-                    'Connection was terminated'
-                ),
-                buttons: ['OK'],
-            });
-            await alert.present();
-
-            this.reconnect();
-        });
-        this.socketSub = this.socketService
-            .onNewMessage()
-            .subscribe(async (data: any) => {
-                console.log('onNewMessage', data);
-                if (typeof data == 'string' && data == 'hi') {
-                    this.sendScreenSize();
-
-                    if (this.settingsService.settings?.hiddenAccess) {
-                        this.socketService.sendMessage('pwRequest');
-                        return;
-                    } else {
-                        const win = this.electronService.window;
-                        win.show();
-                        win.focus();
-                        win.restore();
-
-                        const result = await this.askForConnectPermission();
-
-                        if (!result) {
-                            this.socketService.sendMessage('decline');
-                            this.loading.dismiss();
-                            return;
-                        }
-                        this.videoConnector();
-                    }
-                } else if (
-                    typeof data == 'string' &&
-                    data.substring(0, 8) == 'pwAnswer'
-                ) {
-                    const pw = data.replace(data.substring(0, 9), '');
-                    const pwCorrect =
-                        await this.electronService.bcryptjs.compare(
-                            pw,
-                            this.settingsService.settings.passwordHash
-                        );
-
-                    if (pwCorrect) {
-                        this.videoConnector();
-                    } else {
-                        this.socketService.sendMessage('pwWrong');
-                        this.loading.dismiss();
-                        const alert = await this.alertCtrl.create({
-                            header: this.translateService.instant(
-                                'Password not correct'
-                            ),
-                        });
-                        await alert.present();
-                    }
-                } else if (
-                    typeof data == 'string' &&
-                    data.startsWith('decline')
-                ) {
-                    this.loading.dismiss();
-                } else {
-                    this.peer1.signal(data);
-                }
-            });
-    }
-
-    replaceVideo(stream) {
-        this.peer1.removeStream(this.videoSource.stream);
-        this.peer1.addStream(stream);
-    }
-
-    videoConnector() {
-        this.loading.dismiss();
-        const source = this.videoSource;
-        const stream = source.stream;
-        this.peer1 = new SimplePeer({
-            initiator: true,
-            stream: stream,
-            // channelName: this.id,
-            config: {
-                iceServers: [
-                    {
-                        urls: [
-                            'stun:turn.codext.de',
-                            'stun:stun.nextcloud.com:443',
-                        ],
-                    },
-                    {
-                        username: 'Z1VCyC6DDDrwtgeipeplGmJ0',
-                        credential:
-                            '8a630ce342e1ec3fb2b8dbc8eaa395f837038ddcc5',
-                        urls: [
-                            'turn:turn.codext.de:80?transport=udp',
-                            'turn:turn.codext.de:80?transport=tcp',
-                            'turns:turn.codext.de:443?transport=tcp',
-                        ],
-                    },
-                ],
-            },
-        });
-
-        this.peer1.on('signal', data => {
-            this.socketService.sendMessage(data);
-        });
-        this.peer1.on('error', () => {
-            this.reconnect();
-        });
-        this.peer1.on('close', () => {
-            this.reconnect();
-        });
-        this.peer1.on('connect', () => {
-            this.connected = true;
-            this.connectHelperService.showInfoWindow();
-            const win = this.electronService.window;
-            win.minimize();
-        });
 
         this.peer1.on('data', data => {
             if (data) {
@@ -338,6 +203,194 @@ export class ConnectService {
             }
         });
     }
+
+
+  async askForConnectPermission() {
+    return new Promise(async resolve => {
+        const alert = await this.alertCtrl.create({
+            header: 'New connection',
+            message: 'Do you want to accept the connection?',
+            buttons: [
+                {
+                    text: 'Cancel',
+                    role: 'cancel',
+                    handler: () => {
+                        resolve(false);
+                    },
+                },
+                {
+                    text: 'Accept',
+                    handler: () => {
+                        resolve(true);
+                    },
+                },
+            ],
+        });
+
+        await alert.present();
+    });
+}
+
+    async generateId() {
+        if (this.settingsService.settings?.randomId) {
+            this.id = `${this.connectHelperService.threeDigit()}${this.connectHelperService.threeDigit()}${this.connectHelperService.threeDigit()}`;
+        } else {
+            const nodeMachineId = this.electronService.nodeMachineId; //this.ngxService.remote.require('node-machine-id');
+            const id = await nodeMachineId.machineId();
+            const uniqId = parseInt(id, 36).toString().substring(3, 12);
+            this.id = uniqId;
+        }
+        this.idArray = ('' + this.id).split('');
+    }
+
+    async init() {
+        if (this.initialized) {
+            return;
+        }
+        this.initialized = true;
+        await this.generateId();
+        console.log('[CONNECT] 🎯 Generated ID:', this.id);
+console.log('[CONNECT] Initializing socket service...');
+
+        this.loading = await this.loadingCtrl.create({
+            duration: 15000,
+        });
+
+        // TODO fixme
+        this.electronService.remote.screen.addListener(
+            'display-metrics-changed',
+            () => {
+                this.sendScreenSize();
+            }
+        );
+
+        this.spf = new SimplePeerFiles();
+
+        this.socketService.init();
+        this.socketService.joinRoom(this.id);
+
+     this.sub3 = this.socketService.onDisconnected().subscribe(async () => {
+    console.log('[DISCONNECT] Remote peer disconnected');
+    const alert = await this.alertCtrl.create({
+        header: 'Info',
+        message: 'Connection was terminated',
+        buttons: ['OK'],
+    });
+    await alert.present();
+
+    this.reconnect();
+});
+        this.socketSub = this.socketService
+            .onNewMessage()
+            .subscribe(async (data: any) => {
+           console.log('[CONNECT] 📨 Socket message received:', typeof data, data);
+                if (typeof data == 'string' && data == 'hi') {
+                      console.log('[CONNECT] 👋 Received connection request');
+                    this.sendScreenSize();
+
+                    if (this.settingsService.settings?.hiddenAccess) {
+                        this.socketService.sendMessage('pwRequest');
+                        return;
+                    } else {
+                        const win = this.electronService.window;
+                        win.show();
+                        win.focus();
+                        win.restore();
+
+                        const result = await this.askForConnectPermission();
+
+                        if (!result) {
+                            this.socketService.sendMessage('decline');
+                            this.loading.dismiss();
+                            return;
+                        }
+                        this.videoConnector();
+                    }
+                } else if (
+                    typeof data == 'string' &&
+                    data.substring(0, 8) == 'pwAnswer'
+                ) {
+                    const pw = data.replace(data.substring(0, 9), '');
+                    const pwCorrect =
+                        await this.electronService.bcryptjs.compare(
+                            pw,
+                            this.settingsService.settings.passwordHash
+                        );
+
+                    if (pwCorrect) {
+                        this.videoConnector();
+                    } else {
+                        this.socketService.sendMessage('pwWrong');
+                        this.loading.dismiss();
+                 
+const alert = await this.alertCtrl.create({
+    header: 'Password not correct',
+    buttons: ['OK']
+});
+await alert.present();
+                    }
+                } else if (
+                    typeof data == 'string' &&
+                    data.startsWith('decline')
+                ) {
+                    this.loading.dismiss();
+                } else {
+                    this.peer1.signal(data);
+                }
+            });
+    }
+
+    replaceVideo(stream) {
+        this.peer1.removeStream(this.videoSource.stream);
+        this.peer1.addStream(stream);
+    }
+
+    // videoConnector() {
+    //     this.loading.dismiss();
+    //     const source = this.videoSource;
+    //     const stream = source.stream;
+    //     this.peer1 = new SimplePeer({
+    //         initiator: true,
+    //         stream: stream,
+    //         // channelName: this.id,
+    //         config: {
+    //             iceServers: [
+    //                 {
+    //                     urls: [
+    //                         'stun:turn.codext.de',
+    //                         'stun:stun.nextcloud.com:443',
+    //                     ],
+    //                 },
+    //                 {
+    //                     username: 'Z1VCyC6DDDrwtgeipeplGmJ0',
+    //                     credential:
+    //                         '8a630ce342e1ec3fb2b8dbc8eaa395f837038ddcc5',
+    //                     urls: [
+    //                         'turn:turn.codext.de:80?transport=udp',
+    //                         'turn:turn.codext.de:80?transport=tcp',
+    //                         'turns:turn.codext.de:443?transport=tcp',
+    //                     ],
+    //                 },
+    //             ],
+    //         },
+    //     });
+
+    //     this.peer1.on('signal', data => {
+    //         this.socketService.sendMessage(data);
+    //     });
+    //     this.peer1.on('error', () => {
+    //         this.reconnect();
+    //     });
+    //     this.peer1.on('close', () => {
+    //         this.reconnect();
+    //     });
+    //     this.peer1.on('connect', () => {
+    //         this.connected = true;
+    //         this.connectHelperService.showInfoWindow();
+    //         const win = this.electronService.window;
+    //         win.minimize();
+    //     });
+
 
     async reconnect() {
         const win = this.electronService.window;

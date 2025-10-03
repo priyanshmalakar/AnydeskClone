@@ -211,100 +211,142 @@ export class RemotePage implements OnInit, OnDestroy {
     }
 
     async ngOnInit() {
-        if (this.electronService.isElectron) {
-            const clipboard = this.electronService.clipboard;
-            clipboard
-                .on('text-changed', () => {
-                    const currentText = clipboard.readText();
-                    console.log('currentText', currentText);
-                    this.peer2.send('clipboard-' + currentText);
-                })
-
-                .on('image-changed', () => {
-                    const currentIMage = clipboard.readImage();
-                    console.log('currentText', currentIMage);
-                })
-                .startWatching();
-        }
-
-        let id = this.route.snapshot.queryParams.id;
-        if (!id) {
-            const alert = await this.alertCtrl.create({
-                backdropDismiss: false,
-                header: 'Partner ID',
-                message: 'Geben Sie die ID Ihres Partners ein.',
-                inputs: [
-                    {
-                        name: 'id',
-                        type: 'number',
-                        placeholder: '555555555',
+    // DON'T initialize clipboard here - peer2 doesn't exist yet!
+    
+    let id = this.route.snapshot.queryParams.id;
+    if (!id) {
+        const alert = await this.alertCtrl.create({
+            backdropDismiss: false,
+            header: 'Partner ID',
+            message: 'Enter your partner ID',
+            inputs: [
+                {
+                    name: 'id',
+                    type: 'number',
+                    placeholder: '863059898',
+                },
+            ],
+            buttons: [
+                {
+                    text: 'Connect',
+                    handler: event => {
+                        console.log('[REMOTE] ID entered:', event.id);
+                        id = event.id;
+                        this.init(id);
                     },
-                ],
-                buttons: [
-                    {
-                        text: 'Verbinden',
-                        handler: event => {
-                            console.log('event', event);
-                            id = event.id;
-                            this.init(id);
-                        },
-                    },
-                ],
-            });
-
-            await alert.present();
-        } else {
-            this.init(id);
-        }
-    }
-
-    init(id) {
-        this.appService.sideMenu = false;
-        if (this.electronService.isElectron) {
-            this.spf = new SimplePeerFiles();
-        }
-
-        console.log('id', id);
-        this.socketService.init();
-        this.socketService.joinRoom(id);
-        setTimeout(() => {
-            this.socketService.sendMessage('hi');
-        }, 100);
-
-        // eslint-disable-next-line @typescript-eslint/no-misused-promises
-        this.socketService.onNewMessage().subscribe(async (data: any) => {
-            console.log('onNewMessage', data);
-
-            if (typeof data == 'string' && data?.startsWith('screenSize')) {
-                const size = data.split(',');
-                this.hostScreenSize = {
-                    height: +size[2],
-                    width: +size[1],
-                };
-            } else if (
-                typeof data == 'string' &&
-                data?.startsWith('pwRequest')
-            ) {
-                this.askForPw();
-            } else if (typeof data == 'string' && data?.startsWith('decline')) {
-                this.close();
-                this.cdr.detectChanges();
-            } else if (typeof data == 'string' && data?.startsWith('pwWrong')) {
-                const alert = await this.alertCtrl.create({
-                    header: 'Passwort nicht korrekt',
-                });
-                await alert.present();
-
-                this.askForPw();
-                // this.close();
-                this.cdr.detectChanges();
-            } else {
-                this.peer2.signal(data);
-            }
+                },
+            ],
         });
 
-        this.initPeer(id);
+        await alert.present();
+    } else {
+        this.init(id);
     }
+}
+    // async ngOnInit() {
+    //     if (this.electronService.isElectron) {
+    //         const clipboard = this.electronService.clipboard;
+    //         clipboard
+    //             .on('text-changed', () => {
+    //                 const currentText = clipboard.readText();
+    //                 console.log('currentText', currentText);
+    //                 this.peer2.send('clipboard-' + currentText);
+    //             })
+
+    //             .on('image-changed', () => {
+    //                 const currentIMage = clipboard.readImage();
+    //                 console.log('currentText', currentIMage);
+    //             })
+    //             .startWatching();
+    //     }
+
+    //     let id = this.route.snapshot.queryParams.id;
+    //     if (!id) {
+    //         const alert = await this.alertCtrl.create({
+    //             backdropDismiss: false,
+    //             header: 'Partner ID',
+    //             message: 'Geben Sie die ID Ihres Partners ein.',
+    //             inputs: [
+    //                 {
+    //                     name: 'id',
+    //                     type: 'number',
+    //                     placeholder: '555555555',
+    //                 },
+    //             ],
+    //             buttons: [
+    //                 {
+    //                     text: 'Verbinden',
+    //                     handler: event => {
+    //                         console.log('event', event);
+    //                         id = event.id;
+    //                         this.init(id);
+    //                     },
+    //                 },
+    //             ],
+    //         });
+
+    //         await alert.present();
+    //     } else {
+    //         this.init(id);
+    //     }
+    // }
+
+    init(id) {
+    console.log('[REMOTE] 🎯 Initializing with ID:', id);
+    this.appService.sideMenu = false;
+    
+    if (this.electronService.isElectron) {
+        this.spf = new SimplePeerFiles();
+    }
+
+    this.socketService.init();
+    
+    // Wait for socket to actually connect before proceeding
+    const connectSub = this.socketService.socket.on('connect', () => {
+        console.log('[REMOTE] ✅ Socket connected, joining room:', id);
+        this.socketService.joinRoom(id);
+        
+        // Wait a bit for room join to complete, then send hi
+        setTimeout(() => {
+            console.log('[REMOTE] 👋 Sending "hi" to host');
+            this.socketService.sendMessage('hi');
+        }, 500); // Increased from 100ms to 500ms
+    });
+
+    this.socketService.onNewMessage().subscribe(async (data: any) => {
+        console.log('[REMOTE] 📨 Message received:', typeof data === 'string' ? data.substring(0, 30) : 'signal');
+
+        if (typeof data == 'string' && data?.startsWith('screenSize')) {
+            const size = data.split(',');
+            this.hostScreenSize = {
+                height: +size[2],
+                width: +size[1],
+            };
+            console.log('[REMOTE] 📐 Host screen size:', this.hostScreenSize);
+        } else if (typeof data == 'string' && data?.startsWith('pwRequest')) {
+            console.log('[REMOTE] 🔒 Password requested');
+            this.askForPw();
+        } else if (typeof data == 'string' && data?.startsWith('decline')) {
+            console.log('[REMOTE] ❌ Connection declined');
+            this.close();
+            this.cdr.detectChanges();
+        } else if (typeof data == 'string' && data?.startsWith('pwWrong')) {
+            console.log('[REMOTE] ⚠️ Password incorrect');
+            const alert = await this.alertCtrl.create({
+                header: 'Password not correct',
+                buttons: ['OK']
+            });
+            await alert.present();
+            this.askForPw();
+            this.cdr.detectChanges();
+        } else {
+            console.log('[REMOTE] 🔄 Received WebRTC signal');
+            this.peer2.signal(data);
+        }
+    });
+
+    this.initPeer(id);
+}
 
     async askForPw() {
         const pw: string = await this.pwPrompt();
@@ -317,42 +359,70 @@ export class RemotePage implements OnInit, OnDestroy {
         this.cdr.detectChanges();
     }
 
-    initPeer(id) {
-        this.peer2 = new SimplePeer({
-            // channelName: id,
-            config: {
-                iceServers: [
-                    {
-                        urls: [
-                            'stun:turn.codext.de',
-                            'stun:stun.nextcloud.com:443',
-                        ],
-                    },
-                    {
-                        username: 'Z1VCyC6DDDrwtgeipeplGmJ0',
-                        credential:
-                            '8a630ce342e1ec3fb2b8dbc8eaa395f837038ddcc5',
-                        urls: [
-                            'turn:turn.codext.de:80?transport=udp',
-                            'turn:turn.codext.de:80?transport=tcp',
-                            'turns:turn.codext.de:443?transport=tcp',
-                        ],
-                    },
-                ],
-            },
-        });
+  initPeer(id) {
+    console.log('[REMOTE] 🌐 Creating peer connection...');
+    
+    this.peer2 = new SimplePeer({
+        initiator: false, // Remote is NOT the initiator
+        config: {
+            iceServers: [
+                { urls: "stun:stun.relay.metered.ca:80" },
+                {
+                    urls: "turn:global.relay.metered.ca:80",
+                    username: "63549d560f2efcb312cd67de",
+                    credential: "qh7UD1VgYnwSWhmQ",
+                },
+                {
+                    urls: "turn:global.relay.metered.ca:80?transport=tcp",
+                    username: "63549d560f2efcb312cd67de",
+                    credential: "qh7UD1VgYnwSWhmQ",
+                },
+                {
+                    urls: "turn:global.relay.metered.ca:443",
+                    username: "63549d560f2efcb312cd67de",
+                    credential: "qh7UD1VgYnwSWhmQ",
+                },
+                {
+                    urls: "turns:global.relay.metered.ca:443?transport=tcp",
+                    username: "63549d560f2efcb312cd67de",
+                    credential: "qh7UD1VgYnwSWhmQ",
+                },
+            ],
+        },
+    });
 
-        this.peer2.on('signal', data => {
-            this.socketService.sendMessage(data);
-        });
-        this.peer2.on('stream', stream => {
-            this.connected = true;
+    this.peer2.on('signal', data => {
+        console.log('[REMOTE] 📡 Sending signal to host');
+        this.socketService.sendMessage(data);
+    });
+    
+    this.peer2.on('stream', stream => {
+        console.log('[REMOTE] 🎥 Stream received!');
+        this.connected = true;
+        
+if (this.electronService.isElectron) {
+        console.log('[REMOTE] 📋 Starting clipboard monitoring');
+        const clipboard = this.electronService.clipboard;
+        clipboard
+            .on('text-changed', () => {
+                if (this.peer2 && this.connected) {
+                    const currentText = clipboard.readText();
+                    console.log('[REMOTE] 📋 Clipboard text changed');
+                    this.peer2.send('clipboard-' + currentText);
+                }
+            })
+            .on('image-changed', () => {
+                const currentImage = clipboard.readImage();
+                console.log('[REMOTE] 📋 Clipboard image changed');
+            })
+            .startWatching();
+    }
 
-            const videoBg: HTMLVideoElement =
-                this.elementRef.nativeElement.querySelector('#videobg');
+    const videoBg: HTMLVideoElement =
+        this.elementRef.nativeElement.querySelector('#videobg');
+    videoBg.srcObject = stream;
+    videoBg.play();
 
-            videoBg.srcObject = stream;
-            videoBg.play();
 
             const video: HTMLVideoElement =
                 this.elementRef.nativeElement.querySelector('#video');
@@ -459,17 +529,21 @@ export class RemotePage implements OnInit, OnDestroy {
         this.electronService.window.close();
     }
 
-    calcVideoSize() {
-        this.videoSize = this.video?.getBoundingClientRect();
-        // const height = this.stream?.getVideoTracks()[0].getSettings().height;
-        // const width = this.stream?.getVideoTracks()[0].getSettings().width;
-
-        /*this.hostScreenSize = {
-      height: 1080,
-      width: 1920,
-    };*/
-        console.log('this.hostScreenSize', this.hostScreenSize, this.videoSize);
+   calcVideoSize() {
+    if (!this.video) {
+        console.warn('[REMOTE] ⚠️ Video element not ready yet');
+        return;
     }
+    
+    this.videoSize = this.video.getBoundingClientRect();
+    
+    console.log('[REMOTE] 📏 Video size:', this.videoSize);
+    console.log('[REMOTE] 📐 Host screen size:', this.hostScreenSize);
+    
+    if (!this.hostScreenSize) {
+        console.warn('[REMOTE] ⚠️ Host screen size not received yet');
+    }
+}
 
     ngOnDestroy() {
         this.appService.sideMenu = true;
@@ -502,46 +576,46 @@ export class RemotePage implements OnInit, OnDestroy {
         );
     }
 
-    mouseListener(event: MouseEvent) {
-        console.log('event', event);
-        if (!this.connected) {
-            return;
-        }
-        let type: string;
-        if (event.type == 'mouseup') {
-            type = 'mu';
-        } else if (event.type == 'mousedown') {
-            type = 'md';
-        } else if (event.type == 'dblclick') {
-            type = 'dc';
-        }
-        const x = this.scale(
-            event.offsetX,
-            0,
-            this.videoSize?.width,
-            0,
-            this.hostScreenSize?.width
-        );
-
-        const y = this.scale(
-            event.offsetY,
-            0,
-            this.videoSize?.height,
-            0,
-            this.hostScreenSize?.height
-        );
-
-        console.log(
-            event.offsetX,
-            this.videoSize?.height,
-            this.hostScreenSize?.height,
-            x
-        );
-
-        const stringData = `${type},${x},${y},${event.button}`;
-        this.peer2?.send(stringData);
+   mouseListener(event: MouseEvent) {
+    if (!this.connected) {
+        return;
     }
+    
+    if (!this.hostScreenSize || !this.videoSize) {
+        console.warn('[REMOTE] ⚠️ Screen dimensions not ready, ignoring mouse event');
+        return;
+    }
+    
+    let type: string;
+    if (event.type == 'mouseup') {
+        type = 'mu';
+    } else if (event.type == 'mousedown') {
+        type = 'md';
+    } else if (event.type == 'dblclick') {
+        type = 'dc';
+    }
+    
+    const x = this.scale(
+        event.offsetX,
+        0,
+        this.videoSize.width,
+        0,
+        this.hostScreenSize.width
+    );
 
+    const y = this.scale(
+        event.offsetY,
+        0,
+        this.videoSize.height,
+        0,
+        this.hostScreenSize.height
+    );
+
+    console.log('[REMOTE] 🖱️ Mouse event:', type, 'at', x, y);
+
+    const stringData = `${type},${x},${y},${event.button}`;
+    this.peer2?.send(stringData);
+}
     mouseMoveListener(event) {
         if (!this.connected) {
             return;
